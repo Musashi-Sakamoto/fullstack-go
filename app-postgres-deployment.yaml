@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fullstack-app-postgres
+  labels:
+    app: fullstack-app-postgres
+spec:
+  replicas:
+  selector:
+    matchLabels:
+      app: fullstack-app-postgres
+  template:
+    metadata:
+      labels:
+        app: fullstack-app-postgres
+    spec:
+      containers:
+        - name: fullstack-app-postgres
+          image: musashisakamoto/fullstack:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: postgres-secret

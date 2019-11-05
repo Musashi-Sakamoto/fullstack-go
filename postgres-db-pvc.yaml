@@ -4,10 +4,10 @@ metadata:
   name: postgres-pv-claim
   labels:
     app: fullstack-postgres
-  spec:
-    storageClassName: manual
-    accessModes:
-      - ReadWriteMany
-    resources:
-      requests:
-        storage: 5Gi
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
