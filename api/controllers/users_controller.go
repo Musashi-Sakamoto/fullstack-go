@@ -1,140 +1,172 @@
 package controllers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 
 	"github.com/Musashi-Sakamoto/fullstack/api/auth"
 	"github.com/Musashi-Sakamoto/fullstack/api/models"
-	"github.com/Musashi-Sakamoto/fullstack/api/responses"
 	"github.com/Musashi-Sakamoto/fullstack/api/utils/formaterror"
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 )
 
-func (server *Server) CreateUser(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
-		return
-	}
+func (server *Server) CreateUser(c *gin.Context) {
 	user := models.User{}
-	err = json.Unmarshal(body, &user)
+	err := c.BindJSON(&user)
 	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 	user.Prepare()
 	err = user.Validate("")
 	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 	userCreated, err := user.SaveUser(server.DB)
 
 	if err != nil {
 		formattedError := formaterror.FormatError(err.Error())
-		responses.Error(w, http.StatusInternalServerError, formattedError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"error": formattedError.Error(),
+		})
 		return
 	}
-	w.Header().Set("Location", fmt.Sprintf("%s%s/%d", r.Host, r.RequestURI, userCreated.ID))
-	responses.JSON(w, http.StatusCreated, userCreated)
+	c.Writer.Header().Set("Location", fmt.Sprintf("%s%s/%d", c.Request.Host, c.Request.RequestURI, userCreated.ID))
+	c.JSON(http.StatusCreated, gin.H{
+		"userCreated": userCreated,
+	})
 }
 
-func (server *Server) GetUsers(w http.ResponseWriter, r *http.Request) {
+func (server *Server) GetUsers(c *gin.Context) {
 	user := models.User{}
 	users, err := user.FindAllUsers(server.DB)
 	if err != nil {
-		responses.Error(w, http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
-	responses.JSON(w, http.StatusOK, users)
+	c.JSON(http.StatusOK, gin.H{
+		"users": users,
+	})
 }
 
-func (server *Server) GetUser(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	uid, err := strconv.ParseUint(vars["id"], 10, 32)
+func (server *Server) GetUser(c *gin.Context) {
+	id := c.Param("id")
+
+	uid, err := strconv.ParseUint(id, 10, 64)
+
 	if err != nil {
-		responses.Error(w, http.StatusBadRequest, err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 	user := models.User{}
 	userGotten, err := user.FindUserByID(server.DB, uint32(uid))
 	if err != nil {
-		responses.Error(w, http.StatusBadRequest, err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
-	responses.JSON(w, http.StatusOK, userGotten)
+	c.JSON(http.StatusOK, gin.H{
+		"userGotten": userGotten,
+	})
 }
 
-func (server *Server) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	uid, err := strconv.ParseUint(vars["id"], 10, 32)
+func (server *Server) UpdateUser(c *gin.Context) {
+	id := c.Param("id")
+
+	uid, err := strconv.ParseUint(id, 10, 64)
 	if err != nil {
-		responses.Error(w, http.StatusBadRequest, err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
-		return
-	}
+
 	user := models.User{}
-	err = json.Unmarshal(body, &user)
+	err = c.BindJSON(&user)
 	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
-	tokenID, err := auth.ExtractTokenID(r)
+	tokenID, err := auth.ExtractTokenID(c)
 	if err != nil {
-		responses.Error(w, http.StatusUnauthorized, errors.New("Unauthorized"))
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+			"error": errors.New("Unauthorized").Error(),
+		})
 		return
 	}
 	if tokenID != uint32(uid) {
-		responses.Error(w, http.StatusUnauthorized, errors.New(http.StatusText(http.StatusUnauthorized)))
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+			"error": errors.New(http.StatusText(http.StatusUnauthorized)).Error(),
+		})
 		return
 	}
 	user.Prepare()
 	err = user.Validate("update")
 	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 	updatedUser, err := user.UpdateAUser(server.DB, uint32(uid))
 	if err != nil {
 		formattedError := formaterror.FormatError(err.Error())
-		responses.Error(w, http.StatusInternalServerError, formattedError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"error": formattedError.Error(),
+		})
 		return
 	}
-	responses.JSON(w, http.StatusOK, updatedUser)
+	c.JSON(http.StatusOK, gin.H{
+		"updatedUser": updatedUser,
+	})
 }
 
-func (server *Server) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+func (server *Server) DeleteUser(c *gin.Context) {
+	id := c.Param("id")
+
+	uid, err := strconv.ParseUint(id, 10, 64)
 	user := models.User{}
 
-	uid, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
-		responses.Error(w, http.StatusBadRequest, err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
-	tokenID, err := auth.ExtractTokenID(r)
+	tokenID, err := auth.ExtractTokenID(c)
 	if err != nil {
-		responses.Error(w, http.StatusUnauthorized, errors.New("Unauthorized"))
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+			"error": errors.New("Unauthorized").Error(),
+		})
 		return
 	}
 	if tokenID != 0 && tokenID != uint32(uid) {
-		responses.Error(w, http.StatusUnauthorized, errors.New(http.StatusText(http.StatusUnauthorized)))
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+			"error": errors.New(http.StatusText(http.StatusUnauthorized)),
+		})
 		return
 	}
 	_, err = user.DeleteAUser(server.DB, uint32(uid))
 	if err != nil {
-		responses.Error(w, http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
-	w.Header().Set("Entity", fmt.Sprintf("%d", uid))
-	responses.JSON(w, http.StatusNoContent, "")
+	c.Writer.Header().Set("Entity", fmt.Sprintf("%d", uid))
+	c.JSON(http.StatusNoContent, "")
 }

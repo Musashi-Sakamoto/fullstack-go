@@ -1,21 +1,33 @@
 package controllers
 
-import "github.com/Musashi-Sakamoto/fullstack/api/middlewares"
+import (
+	"github.com/Musashi-Sakamoto/fullstack/api/middlewares"
+	"github.com/gin-gonic/gin"
+)
 
 func (s *Server) initializeRoutes() {
-	s.Router.HandleFunc("/", middlewares.SetMiddlewareJSON(s.Home)).Methods("GET")
+	r := gin.Default()
+	r.Use(gin.Recovery())
+	r.GET("/", middlewares.SetMiddlewareJSON(), s.Home)
+	r.POST("/login", middlewares.SetMiddlewareJSON(), s.Login)
 
-	s.Router.HandleFunc("/login", middlewares.SetMiddlewareJSON(s.Login)).Methods("POST")
+	usersGroup := r.Group("/users", middlewares.SetMiddlewareJSON())
+	{
+		usersGroup.POST("/", s.CreateUser)
+		usersGroup.GET("/", s.GetUsers)
+		usersGroup.GET("/:id", s.GetUser)
+		usersGroup.PUT("/:id", middlewares.SetMiddlewareAuthentication(), s.UpdateUser)
+		usersGroup.DELETE("/:id", middlewares.SetMiddlewareAuthentication(), s.DeleteUser)
+	}
 
-	s.Router.HandleFunc("/users", middlewares.SetMiddlewareJSON(s.CreateUser)).Methods("POST")
-	s.Router.HandleFunc("/users", middlewares.SetMiddlewareJSON(s.GetUsers)).Methods("GET")
-	s.Router.HandleFunc("/users/{id}", middlewares.SetMiddlewareJSON(s.GetUser)).Methods("GET")
-	s.Router.HandleFunc("/users/{id}", middlewares.SetMiddlewareJSON(middlewares.SetMiddlewareAuthentication(s.UpdateUser))).Methods("PUT")
-	s.Router.HandleFunc("/users/{id}", middlewares.SetMiddlewareAuthentication(s.DeleteUser)).Methods("DELETE")
+	postsGroup := r.Group("/posts", middlewares.SetMiddlewareJSON())
+	{
+		postsGroup.POST("/", s.CreatePost)
+		postsGroup.GET("/", s.GetPosts)
+		postsGroup.GET("/:id", s.GetPost)
+		postsGroup.PUT("/:id", middlewares.SetMiddlewareAuthentication(), s.UpdatePost)
+		postsGroup.DELETE("/:id", middlewares.SetMiddlewareAuthentication(), s.DeletePost)
+	}
 
-	s.Router.HandleFunc("/posts", middlewares.SetMiddlewareJSON(s.CreatePost)).Methods("POST")
-	s.Router.HandleFunc("/posts", middlewares.SetMiddlewareJSON(s.GetPosts)).Methods("GET")
-	s.Router.HandleFunc("/posts/{id}", middlewares.SetMiddlewareJSON(s.GetPost)).Methods("GET")
-	s.Router.HandleFunc("/posts/{id}", middlewares.SetMiddlewareJSON(middlewares.SetMiddlewareAuthentication(s.UpdatePost))).Methods("PUT")
-	s.Router.HandleFunc("/posts/{id}", middlewares.SetMiddlewareAuthentication(s.DeletePost)).Methods("DELETE")
+	r.Run(":8080")
 }

@@ -1,27 +1,22 @@
 package controllers
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/Musashi-Sakamoto/fullstack/api/auth"
 	"github.com/Musashi-Sakamoto/fullstack/api/models"
-	"github.com/Musashi-Sakamoto/fullstack/api/responses"
 	"github.com/Musashi-Sakamoto/fullstack/api/utils/formaterror"
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func (server *Server) Login(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
-		return
-	}
+func (server *Server) Login(c *gin.Context) {
 	user := models.User{}
-	err = json.Unmarshal(body, &user)
+	err := c.BindJSON(&user)
 	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
@@ -29,17 +24,23 @@ func (server *Server) Login(w http.ResponseWriter, r *http.Request) {
 	err = user.Validate("login")
 
 	if err != nil {
-		responses.Error(w, http.StatusUnprocessableEntity, err)
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
 	token, err := server.SignIn(user.Email, user.Password)
 	if err != nil {
 		formattedError := formaterror.FormatError(err.Error())
-		responses.Error(w, http.StatusUnprocessableEntity, formattedError)
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"error": formattedError.Error(),
+		})
 		return
 	}
-	responses.JSON(w, http.StatusOK, token)
+	c.JSON(http.StatusOK, gin.H{
+		"token": token,
+	})
 }
 
 func (server *Server) SignIn(email, password string) (string, error) {

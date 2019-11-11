@@ -5,23 +5,26 @@ import (
 	"net/http"
 
 	"github.com/Musashi-Sakamoto/fullstack/api/auth"
-	"github.com/Musashi-Sakamoto/fullstack/api/responses"
+
+	"github.com/gin-gonic/gin"
 )
 
-func SetMiddlewareJSON(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		next(w, r)
+func SetMiddlewareJSON() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Content-Type", "application/json")
+		c.Next()
 	}
 }
 
-func SetMiddlewareAuthentication(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		err := auth.TokenValid(r)
+func SetMiddlewareAuthentication() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := auth.TokenValid(c)
 		if err != nil {
-			responses.Error(w, http.StatusUnauthorized, errors.New("Unauthorized"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": errors.New("Unauthorized").Error(),
+			})
 			return
 		}
-		next(w, r)
+		c.Next()
 	}
 }

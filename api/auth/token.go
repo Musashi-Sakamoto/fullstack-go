@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 )
 
 func CreateToken(user_id uint32) (string, error) {
@@ -22,8 +22,8 @@ func CreateToken(user_id uint32) (string, error) {
 	return token.SignedString([]byte(os.Getenv("API_SECRET")))
 }
 
-func TokenValid(r *http.Request) error {
-	tokenString := ExtractToken(r)
+func TokenValid(c *gin.Context) error {
+	tokenString := ExtractToken(c)
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
@@ -39,21 +39,20 @@ func TokenValid(r *http.Request) error {
 	return nil
 }
 
-func ExtractToken(r *http.Request) string {
-	keys := r.URL.Query()
-	token := keys.Get("token")
+func ExtractToken(c *gin.Context) string {
+	token := c.Query("token")
 	if token != "" {
 		return token
 	}
-	bearerToken := r.Header.Get("Authorization")
+	bearerToken := c.GetHeader("Authorization")
 	if len(strings.Split(bearerToken, " ")) == 2 {
 		return strings.Split(bearerToken, " ")[1]
 	}
 	return ""
 }
 
-func ExtractTokenID(r *http.Request) (uint32, error) {
-	tokenString := ExtractToken(r)
+func ExtractTokenID(c *gin.Context) (uint32, error) {
+	tokenString := ExtractToken(c)
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
